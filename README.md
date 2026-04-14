@@ -1,129 +1,164 @@
-# OptiRide ETL Pipeline
+# Real-Time Stock Market Analysis Pipeline
 
-A data engineering pipeline that extracts NYC Citi Bike and weather data, transforms it into a dimensional model, and loads it into PostgreSQL using PySpark and Apache Airflow.
+A fully containerized real-time data pipeline that streams stock market data from the Alpha Vantage API through Apache Kafka and Apache Spark into PostgreSQL, with live monitoring via Grafana.
 
 ## Architecture
 
 ```
-[Citi Bike API] ──┐                    ┌─── dim_station
-                  ├──► Extract ──► Transform ──► dim_weather      ──► PostgreSQL
-[Weather API]  ───┘                    └─── fact_bike_weather
+Alpha Vantage API → Python Producer → Kafka → Spark Structured Streaming → PostgreSQL → Grafana
 ```
+
+### Services
+
+| Service | Description | Port |
+|---------|-------------|------|
+| **Producer** | Fetches stock data from Alpha Vantage API every 5 minutes and publishes to Kafka | - |
+| **Kafka** | Message broker using KRaft mode (no Zookeeper) | 9092 (internal), 9094 (external) |
+| **Kafka UI** | Web UI for monitoring Kafka topics and messages | [localhost:8085](http://localhost:8085) |
+| **Spark Master** | Coordinates Spark cluster | [localhost:8081](http://localhost:8081) |
+| **Spark Worker** | Executes Spark jobs (2 cores, 2GB RAM) | - |
+| **Consumer** | Spark Structured Streaming job that reads from Kafka and writes to PostgreSQL | - |
+| **PostgreSQL** | Stores processed stock data (Debezium image with logical replication support) | 5434 |
+| **pgAdmin** | Web UI for PostgreSQL management | [localhost:5050](http://localhost:5050) |
+| **Grafana** | Real-time dashboard for stock data visualization | [localhost:3000](http://localhost:3000) |
 
 ## Tech Stack
 
-- **Orchestration:** Apache Airflow
-- **Processing:** PySpark
-- **Database:** PostgreSQL
-- **APIs:** Citi Bike NYC, Open-Meteo Weather
+- **Languages:** Python, SQL
+- **Streaming:** Apache Kafka (KRaft mode), Apache Spark Structured Streaming
+- **Database:** PostgreSQL 17
+- **Containerization:** Docker, Docker Compose
+- **Monitoring:** Grafana, Kafka UI, pgAdmin
+- **API:** Alpha Vantage (via RapidAPI)
 
-## Data Model
+## Prerequisites
 
-### Dimension Tables
-- **dim_station** - Bike station details (id, name, location, capacity)
-- **dim_weather** - Hourly weather conditions (temperature, precipitation, wind, humidity)
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) installed
+- A free [RapidAPI](https://rapidapi.com/) account with access to the Alpha Vantage API
 
-### Fact Table
-- **fact_bike_weather** - Bike availability joined with weather data by timestamp
+## Getting Started
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/CHARLESojini/Real-Time-Stock-Market-Analysis.git
+cd Real-Time-Stock-Market-Analysis
+```
+
+### 2. Set up environment variables
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and fill in your actual credentials:
+
+```
+RAPIDAPI_KEY=your_rapidapi_key_here
+RAPIDAPI_HOST=alpha-vantage.p.rapidapi.com
+POSTGRES_USER=your_username
+POSTGRES_PASSWORD=your_password
+KAFKA_BOOTSTRAP_SERVER=kafka:9092
+```
+
+### 3. Start the pipeline
+
+```bash
+docker compose up -d --build
+```
+
+This single command spins up all 9 services. The producer will begin fetching stock data automatically every 5 minutes.
+
+### 4. Verify the pipeline
+
+Check that all containers are running:
+
+```bash
+docker compose ps
+```
+
+Monitor the producer logs:
+
+```bash
+docker compose logs -f producer
+```
+
+Monitor the consumer logs:
+
+```bash
+docker compose logs -f consumer
+```
+
+### 5. Access the dashboards
+
+- **Grafana:** [localhost:3000](http://localhost:3000) (admin / admin)
+- **Kafka UI:** [localhost:8085](http://localhost:8085)
+- **pgAdmin:** [localhost:5050](http://localhost:5050) (admin@admin.com / admin)
+- **Spark Master UI:** [localhost:8081](http://localhost:8081)
+
+### 6. Set up Grafana (first time only)
+
+1. Log into Grafana at [localhost:3000](http://localhost:3000)
+2. Go to **Connections → Data Sources → Add data source → PostgreSQL**
+3. Configure the connection:
+   - Host: `postgres_db:5432`
+   - Database: `stock_data`
+   - User: your POSTGRES_USER from `.env`
+   - Password: your POSTGRES_PASSWORD from `.env`
+   - TLS/SSL Mode: disable
+4. Click **Save & Test**
+
+### 7. Query the data
+
+Connect to PostgreSQL directly:
+
+```bash
+docker exec -it postgres_db psql -U your_username -d stock_data -c "SELECT * FROM stocks LIMIT 10;"
+```
+
+## Tracked Symbols
+
+| Symbol | Company |
+|--------|---------|
+| KOS | Kosmos Energy |
+| TROX | Tronox Holdings |
+| WTI | W&T Offshore |
+
+## Stopping the Pipeline
+
+```bash
+docker compose down
+```
+
+To stop and remove all data volumes:
+
+```bash
+docker compose down -v
+```
 
 ## Project Structure
 
 ```
-optiride_eetl/
-├── extract.py          # API data extraction
-├── transform.py        # PySpark transformations
-├── load.py             # PostgreSQL loading
-├── optiride_dag.py     # Airflow DAG definition
-├── logger.py           # Custom logging utility
-├── config.yaml         # Configuration file
-└── requirements.txt    # Dependencies
-```
-
-## Setup
-
-### 1. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Configure Database
-
-Create a `config.yaml` file:
-
-```yaml
-storage:
-  raw: ./data/raw
-  processed: ./data/processed
-
-database:
-  host: localhost
-  port: 5432
-  dbname: optiride
-  user: your_user
-  password: your_password
-```
-
-### 3. Download PostgreSQL JDBC Driver
-
-```bash
-# Download to your preferred location
-wget https://jdbc.postgresql.org/download/postgresql-42.6.0.jar
-```
-
-Update the path in `load.py` to match your driver location.
-
-### 4. Run the Pipeline
-
-**Manual execution:**
-```bash
-python extract.py
-python transform.py
-python load.py
-```
-
-**With Airflow:**
-```bash
-# Copy DAG to Airflow
-cp optiride_dag.py ~/airflow/dags/
-
-# Start Airflow
-airflow standalone
-```
-
-## Pipeline Flow
-
-1. **Extract** - Fetches real-time data from Citi Bike and Open-Meteo APIs, saves as JSON
-2. **Transform** - Processes with PySpark, creates dimensional model, outputs Parquet files
-3. **Load** - Creates PostgreSQL schema and tables, loads data via JDBC
-
-## Sample Queries
-
-```sql
--- Bike availability by weather condition
-SELECT 
-    w.temperature,
-    w.precipitation,
-    AVG(f.free_bikes) as avg_bikes
-FROM optiride.fact_bike_weather f
-JOIN optiride.dim_weather w ON f.weather_id = w.weather_id
-GROUP BY w.temperature, w.precipitation;
-
--- Station utilization
-SELECT 
-    s.station_name,
-    AVG(f.free_bikes) as avg_available,
-    AVG(f.slots) as avg_capacity
-FROM optiride.fact_bike_weather f
-JOIN optiride.dim_station s ON f.station_id = s.station_id
-GROUP BY s.station_name
-ORDER BY avg_available DESC;
+Real-Time-Stock-Market-Analysis/
+├── producer/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── config.py
+│   ├── extract.py
+│   ├── main.py
+│   └── producer_setup.py
+├── Consumer/
+│   ├── Dockerfile
+│   ├── config.py
+│   └── consumer.py
+├── compose.yml
+├── .env.example
+├── .gitignore
+└── README.md
 ```
 
 ## Author
 
-Chima Ojini
-
-## License
-
-MIT
+**Chima Charles Ojini**
+- LinkedIn: [linkedin.com/in/charles-ojini](https://linkedin.com/in/charles-ojini/)
+- GitHub: [github.com/CHARLESojini](https://github.com/CHARLESojini)
