@@ -5,7 +5,9 @@ A fully containerized real-time data pipeline that streams stock market data fro
 ## Architecture
 
 ```
-Alpha Vantage API → Python Producer → Kafka → Spark Structured Streaming → PostgreSQL → Grafana
+## Architecture
+
+![Architecture Diagram](architecture.png)
 ```
 
 ### Services
