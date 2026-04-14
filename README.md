@@ -5,8 +5,6 @@ A fully containerized real-time data pipeline that streams stock market data fro
 ## Architecture
 
 ```
-## Architecture
-
 ![Architecture Diagram](architecture.png)
 ```
 
