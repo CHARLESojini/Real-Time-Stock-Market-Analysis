@@ -118,8 +118,10 @@ docker exec -it postgres_db psql -U your_username -d stock_data -c "SELECT * FRO
 
 | Symbol | Company |
 |--------|---------|
+| AAPL | Apple Inc. |
 | KOS | Kosmos Energy |
 | TROX | Tronox Holdings |
+| TSLA | Tesla Inc. |
 | WTI | W&T Offshore |
 
 ## Stopping the Pipeline
