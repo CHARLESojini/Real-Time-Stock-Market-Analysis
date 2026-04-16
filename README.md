@@ -1,10 +1,46 @@
 # Real-Time Stock Market Analysis Pipeline
 
-A fully containerized real-time data pipeline that streams stock market data from the Alpha Vantage API through Apache Kafka and Apache Spark into PostgreSQL, with live monitoring via Grafana.
+## The Problem
 
-## Architecture
+Companies tracking stock market movements face a critical challenge: **no real-time visibility into stock price changes**. Traditional approaches rely on manual data collection — analysts pulling reports from financial platforms, copying data into spreadsheets, and building static charts that are outdated the moment they're created.
+
+This creates three costly consequences:
+
+1. **Delayed decision-making** — By the time data is collected, cleaned, and visualized, market conditions have already shifted. Opportunities are missed, and risk exposure goes unnoticed.
+2. **Human error** — Manual data entry introduces inconsistencies. A mistyped decimal, a skipped time interval, or a forgotten symbol can distort analysis and lead to poor decisions.
+3. **No scalability** — As the number of tracked symbols grows, the manual process breaks down. What works for 3 stocks fails at 50.
+
+## The Solution
+
+This project eliminates the manual bottleneck by building a **fully automated, real-time data pipeline** that continuously ingests stock market data, processes it through a streaming engine, stores it in a relational database, and visualizes it on a live dashboard — all running inside Docker containers with a single command.
+
+### How It Works
+
+```
+Alpha Vantage API → Python Producer → Kafka → Spark Structured Streaming → PostgreSQL → Grafana
+```
 
 ![Architecture Diagram](architecture.png)
+
+**Every 5 minutes**, the pipeline automatically:
+
+1. **Ingests** — The Python producer fetches intraday stock data (open, high, low, close) from the Alpha Vantage API for each tracked symbol.
+2. **Streams** — Data is published to an Apache Kafka topic (`stock_analysis`), decoupling the data source from downstream consumers.
+3. **Processes** — Apache Spark Structured Streaming reads from Kafka in real time, parses the JSON payloads, casts data types, and writes microbatches to PostgreSQL via JDBC.
+4. **Stores** — PostgreSQL persists all processed records with full history, enabling both real-time and historical analysis.
+5. **Visualizes** — Grafana queries PostgreSQL and renders live dashboards showing closing prices, price spreads, latest quotes, and total records ingested.
+
+### Business Impact
+
+| Before | After |
+|--------|-------|
+| Manual data collection every few hours | Automated ingestion every 5 minutes |
+| Static spreadsheets with stale data | Live dashboard with real-time updates |
+| 3 stocks tracked manually | 5+ symbols with no additional effort |
+| No historical trend visibility | Full time-series history stored in PostgreSQL |
+| Error-prone manual entry | 100% automated with fault tolerance |
+
+## Architecture
 
 ### Services
 
@@ -29,91 +65,6 @@ A fully containerized real-time data pipeline that streams stock market data fro
 - **Monitoring:** Grafana, Kafka UI, pgAdmin
 - **API:** Alpha Vantage (via RapidAPI)
 
-## Prerequisites
-
-- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) installed
-- A free [RapidAPI](https://rapidapi.com/) account with access to the Alpha Vantage API
-
-## Getting Started
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/CHARLESojini/Real-Time-Stock-Market-Analysis.git
-cd Real-Time-Stock-Market-Analysis
-```
-
-### 2. Set up environment variables
-
-```bash
-cp .env.example .env
-```
-
-Open `.env` and fill in your actual credentials:
-
-```
-RAPIDAPI_KEY=your_rapidapi_key_here
-RAPIDAPI_HOST=alpha-vantage.p.rapidapi.com
-POSTGRES_USER=your_username
-POSTGRES_PASSWORD=your_password
-KAFKA_BOOTSTRAP_SERVER=kafka:9092
-```
-
-### 3. Start the pipeline
-
-```bash
-docker compose up -d --build
-```
-
-This single command spins up all 9 services. The producer will begin fetching stock data automatically every 5 minutes.
-
-### 4. Verify the pipeline
-
-Check that all containers are running:
-
-```bash
-docker compose ps
-```
-
-Monitor the producer logs:
-
-```bash
-docker compose logs -f producer
-```
-
-Monitor the consumer logs:
-
-```bash
-docker compose logs -f consumer
-```
-
-### 5. Access the dashboards
-
-- **Grafana:** [localhost:3000](http://localhost:3000) (admin / admin)
-- **Kafka UI:** [localhost:8085](http://localhost:8085)
-- **pgAdmin:** [localhost:5050](http://localhost:5050) (admin@admin.com / admin)
-- **Spark Master UI:** [localhost:8081](http://localhost:8081)
-
-### 6. Set up Grafana (first time only)
-
-1. Log into Grafana at [localhost:3000](http://localhost:3000)
-2. Go to **Connections → Data Sources → Add data source → PostgreSQL**
-3. Configure the connection:
-   - Host: `postgres_db:5432`
-   - Database: `stock_data`
-   - User: your POSTGRES_USER from `.env`
-   - Password: your POSTGRES_PASSWORD from `.env`
-   - TLS/SSL Mode: disable
-4. Click **Save & Test**
-
-### 7. Query the data
-
-Connect to PostgreSQL directly:
-
-```bash
-docker exec -it postgres_db psql -U your_username -d stock_data -c "SELECT * FROM stocks LIMIT 10;"
-```
-
 ## Tracked Symbols
 
 | Symbol | Company |
@@ -124,15 +75,98 @@ docker exec -it postgres_db psql -U your_username -d stock_data -c "SELECT * FRO
 | TSLA | Tesla Inc. |
 | WTI | W&T Offshore |
 
-## Stopping the Pipeline
+---
+
+## For Recruiters: How to Run This Project
+
+Everything is containerized with Docker Compose. You don't need Python, Kafka, Spark, or PostgreSQL installed on your machine — just Docker.
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) installed
+- A free [RapidAPI](https://rapidapi.com/) account with access to the Alpha Vantage API
+
+### Step 1: Clone the Repository
 
 ```bash
-docker compose down
+git clone https://github.com/CHARLESojini/Real-Time-Stock-Market-Analysis.git
+cd Real-Time-Stock-Market-Analysis
 ```
 
-To stop and remove all data volumes:
+### Step 2: Set Up Environment Variables
 
 ```bash
+cp .env.example .env
+```
+
+Open the `.env` file and fill in your credentials:
+
+```
+RAPIDAPI_KEY=your_rapidapi_key_here
+RAPIDAPI_HOST=alpha-vantage.p.rapidapi.com
+POSTGRES_USER=your_username
+POSTGRES_PASSWORD=your_password
+KAFKA_BOOTSTRAP_SERVER=kafka:9092
+```
+
+### Step 3: Start the Entire Pipeline
+
+```bash
+docker compose up -d --build
+```
+
+This single command spins up all 9 services. The producer will begin fetching stock data automatically every 5 minutes.
+
+### Step 4: Verify Everything Is Running
+
+```bash
+docker compose ps
+```
+
+All containers should show `running` status. Monitor the data flowing:
+
+```bash
+# Watch the producer fetch and send data
+docker compose logs -f producer
+
+# Watch the consumer process and write to PostgreSQL
+docker compose logs -f consumer
+```
+
+### Step 5: Access the Dashboards
+
+| Dashboard | URL | Credentials |
+|-----------|-----|-------------|
+| **Grafana** | [localhost:3000](http://localhost:3000) | admin / admin |
+| **Kafka UI** | [localhost:8085](http://localhost:8085) | No login required |
+| **pgAdmin** | [localhost:5050](http://localhost:5050) | admin@admin.com / admin |
+| **Spark Master** | [localhost:8081](http://localhost:8081) | No login required |
+
+### Step 6: Set Up the Grafana Dashboard (First Time Only)
+
+1. Log into Grafana at [localhost:3000](http://localhost:3000)
+2. Go to **Connections → Data Sources → Add data source → PostgreSQL**
+3. Configure the connection:
+   - Host: `postgres_db:5432`
+   - Database: `stock_data`
+   - User: your POSTGRES_USER from `.env`
+   - Password: your POSTGRES_PASSWORD from `.env`
+   - TLS/SSL Mode: disable
+4. Click **Save & Test** — you should see "Database Connection OK"
+
+### Step 7: Query the Data Directly
+
+```bash
+docker exec -it postgres_db psql -U your_username -d stock_data -c "SELECT * FROM stocks LIMIT 10;"
+```
+
+### Stopping the Pipeline
+
+```bash
+# Stop all containers (keeps data)
+docker compose down
+
+# Stop and delete all data
 docker compose down -v
 ```
 
@@ -143,22 +177,25 @@ Real-Time-Stock-Market-Analysis/
 ├── producer/
 │   ├── Dockerfile
 │   ├── requirements.txt
-│   ├── config.py
-│   ├── extract.py
-│   ├── main.py
-│   └── producer_setup.py
+│   ├── config.py          # API configuration and logging
+│   ├── extract.py         # API data extraction and transformation
+│   ├── main.py            # Entry point with automated scheduling loop
+│   └── producer_setup.py  # Kafka producer configuration
 ├── Consumer/
 │   ├── Dockerfile
-│   ├── config.py
-│   └── consumer.py
-├── compose.yml
-├── .env.example
+│   ├── config.py          # PostgreSQL and Kafka schema configuration
+│   └── consumer.py        # Spark Structured Streaming job
+├── compose.yml            # Docker Compose orchestration for all 9 services
+├── .env.example           # Template for required environment variables
 ├── .gitignore
+├── architecture.png       # Pipeline architecture diagram
 └── README.md
 ```
 
 ## Author
 
-**Chima Charles Ojini**
+**Chima Charles Ojini** — Data Engineer
+
 - LinkedIn: [linkedin.com/in/charles-ojini](https://linkedin.com/in/charles-ojini/)
 - GitHub: [github.com/CHARLESojini](https://github.com/CHARLESojini)
+- Portfolio: [charlesojini.github.io/my-portfolio](https://charlesojini.github.io/my-portfolio/)
