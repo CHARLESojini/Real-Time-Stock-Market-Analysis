@@ -40,6 +40,10 @@ Alpha Vantage API → Python Producer → Kafka → Spark Structured Streaming �
 | No historical trend visibility | Full time-series history stored in PostgreSQL |
 | Error-prone manual entry | 100% automated with fault tolerance |
 
+### Live Dashboard
+
+![Grafana Dashboard](dashboard.png)
+
 ## Architecture
 
 ### Services
