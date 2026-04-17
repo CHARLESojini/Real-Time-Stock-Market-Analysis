@@ -42,7 +42,7 @@ Alpha Vantage API → Python Producer → Kafka → Spark Structured Streaming �
 
 ### Live Dashboard
 
-![Grafana Dashboard](dashboard.png)
+![Grafana Dashboard](dashboard1.png)
 
 ## Architecture
 
