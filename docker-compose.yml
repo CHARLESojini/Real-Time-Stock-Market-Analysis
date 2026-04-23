@@ -4,6 +4,7 @@ volumes:
   kafka_data:        # Named volume for Kafka log and topic data
   ivy_cache:         # Named volume for PySpark installed packages (dependency cache)
   postgres_data:     # Named volume to persist PostgreSQL database files
+  grafana_data:      # Named volume to persist Grafana dashboards and settings
 
 networks:
   stock_data:        # Shared network for container-to-container communication
@@ -175,6 +176,8 @@ services:
     ports:
       - "3000:3000"                          # Expose Grafana web UI on localhost:3000 (default Grafana port)
     depends_on:
-      - postgres                             # Ensure PostgreSQL starts before Grafana (Grafana queries Postgres as a data source)
+      - postgres 
+    volumes:
+      - grafana_data:/var/lib/grafana      # Persist dashboards, data sources, and settings                            # Ensure PostgreSQL starts before Grafana (Grafana queries Postgres as a data source)
     networks:
       - stock_data                           # Attach to shared network so Grafana can reach PostgreSQL via container name

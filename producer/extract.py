@@ -18,7 +18,7 @@ def connect_to_api() -> List[Dict]:
         response = connect_to_api()
     """
 
-    stocks = ['KOS', 'TROX', 'WTI']
+    stocks = ['KOS', 'TROX', 'WTI', 'AAPL', 'TSLA']
     json_response = []
 
     for stock in range(0, len(stocks)):
