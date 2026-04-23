@@ -12,15 +12,15 @@ This creates three costly consequences:
 
 ## The Solution
 
-This project eliminates the manual bottleneck by building a **fully automated, real-time data pipeline** that continuously ingests stock market data, processes it through a streaming engine, stores it in a relational database, and visualizes it on a live dashboard — all running inside Docker containers with a single command.
+This project eliminates the manual bottleneck by building a **fully automated, real-time data pipeline** that continuously ingests stock market data, processes it through a streaming engine, stores it in a relational database, and visualizes it on live dashboards — all running inside Docker containers with a single command.
 
 ### How It Works
 
 ```
-Alpha Vantage API → Python Producer → Kafka → Spark Structured Streaming → PostgreSQL → Grafana
+Alpha Vantage API → Python Producer → Kafka → Spark Structured Streaming → PostgreSQL → Grafana + Tableau
 ```
 
-![Architecture Diagram](architecture.png)
+![Architecture Diagram](images/architecture.png)
 
 **Every 5 minutes**, the pipeline automatically:
 
@@ -28,7 +28,7 @@ Alpha Vantage API → Python Producer → Kafka → Spark Structured Streaming �
 2. **Streams** — Data is published to an Apache Kafka topic (`stock_analysis`), decoupling the data source from downstream consumers.
 3. **Processes** — Apache Spark Structured Streaming reads from Kafka in real time, parses the JSON payloads, casts data types, and writes microbatches to PostgreSQL via JDBC.
 4. **Stores** — PostgreSQL persists all processed records with full history, enabling both real-time and historical analysis.
-5. **Visualizes** — Grafana queries PostgreSQL and renders live dashboards showing closing prices, price spreads, latest quotes, and total records ingested.
+5. **Visualizes** — Grafana queries PostgreSQL and renders live dashboards showing closing prices, price spreads, latest quotes, and total records ingested. Tableau connects directly to PostgreSQL for deeper historical trend analysis and multi-stock performance reporting.
 
 ### Business Impact
 
@@ -40,9 +40,15 @@ Alpha Vantage API → Python Producer → Kafka → Spark Structured Streaming �
 | No historical trend visibility | Full time-series history stored in PostgreSQL |
 | Error-prone manual entry | 100% automated with fault tolerance |
 
-### Live Dashboard
+### Live Dashboards
 
-![Grafana Dashboard](dashboard1.png)
+**Grafana — Real-Time Monitoring**
+
+![Grafana Dashboard](images/dashboard1.png)
+
+**Tableau — Historical Analysis**
+
+![Tableau Dashboard](images/tableau.png)
 
 ## Architecture
 
@@ -59,6 +65,7 @@ Alpha Vantage API → Python Producer → Kafka → Spark Structured Streaming �
 | **PostgreSQL** | Stores processed stock data (Debezium image with logical replication support) | 5434 |
 | **pgAdmin** | Web UI for PostgreSQL management | [localhost:5050](http://localhost:5050) |
 | **Grafana** | Real-time dashboard for stock data visualization | [localhost:3000](http://localhost:3000) |
+| **Tableau** | Desktop BI tool for historical trend analysis and multi-stock performance reporting | Local |
 
 ## Tech Stack
 
@@ -66,7 +73,8 @@ Alpha Vantage API → Python Producer → Kafka → Spark Structured Streaming �
 - **Streaming:** Apache Kafka (KRaft mode), Apache Spark Structured Streaming
 - **Database:** PostgreSQL 17
 - **Containerization:** Docker, Docker Compose
-- **Monitoring:** Grafana, Kafka UI, pgAdmin
+- **Visualization:** Grafana (real-time monitoring), Tableau (historical analysis & reporting)
+- **Monitoring:** Kafka UI, pgAdmin
 - **API:** Alpha Vantage (via RapidAPI)
 
 ## Tracked Symbols
@@ -116,7 +124,7 @@ KAFKA_BOOTSTRAP_SERVER=kafka:9092
 ### Step 3: Start the Entire Pipeline
 
 ```bash
-docker compose up -d --build
+docker-compose up -d --build
 ```
 
 This single command spins up all 9 services. The producer will begin fetching stock data automatically every 5 minutes.
@@ -124,17 +132,17 @@ This single command spins up all 9 services. The producer will begin fetching st
 ### Step 4: Verify Everything Is Running
 
 ```bash
-docker compose ps
+docker-compose ps
 ```
 
 All containers should show `running` status. Monitor the data flowing:
 
 ```bash
 # Watch the producer fetch and send data
-docker compose logs -f producer
+docker-compose logs -f producer
 
 # Watch the consumer process and write to PostgreSQL
-docker compose logs -f consumer
+docker-compose logs -f consumer
 ```
 
 ### Step 5: Access the Dashboards
@@ -158,7 +166,23 @@ docker compose logs -f consumer
    - TLS/SSL Mode: disable
 4. Click **Save & Test** — you should see "Database Connection OK"
 
-### Step 7: Query the Data Directly
+### Step 7: Set Up Tableau (Optional — for Historical Analysis)
+
+1. Install [Tableau Desktop](https://www.tableau.com/products/desktop/download) (free trial available)
+2. Install the PostgreSQL JDBC driver:
+   ```bash
+   mkdir -p ~/Library/Tableau/Drivers
+   # Download postgresql-*.jar from https://jdbc.postgresql.org/download/
+   mv ~/Downloads/postgresql-*.jar ~/Library/Tableau/Drivers/
+   ```
+3. Open Tableau → Connect → PostgreSQL and enter:
+   - **Server:** `localhost`
+   - **Port:** `5434`
+   - **Database:** `stock_data`
+   - **Username / Password:** from your `.env` file
+4. Select the `stocks` table and start building dashboards
+
+### Step 8: Query the Data Directly
 
 ```bash
 docker exec -it postgres_db psql -U your_username -d stock_data -c "SELECT * FROM stocks LIMIT 10;"
@@ -168,10 +192,10 @@ docker exec -it postgres_db psql -U your_username -d stock_data -c "SELECT * FRO
 
 ```bash
 # Stop all containers (keeps data)
-docker compose down
+docker-compose down
 
 # Stop and delete all data
-docker compose down -v
+docker-compose down -v
 ```
 
 ## Project Structure
@@ -181,18 +205,22 @@ Real-Time-Stock-Market-Analysis/
 ├── producer/
 │   ├── Dockerfile
 │   ├── requirements.txt
-│   ├── config.py          # API configuration and logging
-│   ├── extract.py         # API data extraction and transformation
-│   ├── main.py            # Entry point with automated scheduling loop
-│   └── producer_setup.py  # Kafka producer configuration
+│   ├── config.py              # API configuration and logging
+│   ├── extract.py             # API data extraction and transformation
+│   ├── main.py                # Entry point with automated scheduling loop
+│   └── producer_setup.py      # Kafka producer configuration
 ├── Consumer/
 │   ├── Dockerfile
-│   ├── config.py          # PostgreSQL and Kafka schema configuration
-│   └── consumer.py        # Spark Structured Streaming job
-├── compose.yml            # Docker Compose orchestration for all 9 services
-├── .env.example           # Template for required environment variables
+│   ├── config.py              # PostgreSQL and Kafka schema configuration
+│   └── consumer.py            # Spark Structured Streaming job
+├── images/
+│   ├── architecture.png       # Pipeline architecture diagram
+│   ├── dashboard.png          # Grafana dashboard screenshot
+│   ├── dashboard1.png         # Grafana dashboard screenshot
+│   └── tableau.png            # Tableau dashboard screenshot
+├── docker-compose.yml         # Docker Compose orchestration for all 9 services
+├── .env.example               # Template for required environment variables
 ├── .gitignore
-├── architecture.png       # Pipeline architecture diagram
 └── README.md
 ```
 
